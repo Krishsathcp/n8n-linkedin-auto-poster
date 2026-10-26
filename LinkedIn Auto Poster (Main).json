@@ -1,0 +1,1915 @@
+{
+  "name": "LinkedIn Auto Poster (Main)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtHour": 11
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -224,
+        0
+      ],
+      "id": "2879ccb6-1060-487f-8bfd-5b7ba4e1bd10",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "fromEmail": "cpkrishsath21@gmail.com",
+        "toEmail": "cpkrishsath2005@gmail.com",
+        "subject": "Weekly check — Quick 30s: did you post last Monday?",
+        "html": "Hi there,\n\nQuick question — did you post last Monday?\n\nPlease open this short form and answer 2 quick Qs (30s):\n👉 <a href=\"https://docs.google.com/forms/d/e/1FAIpQLSfbXYsPHDNrFZXMgHLL7Jse8obl8HL1xq82duQ8YFeCFAGVnQ/viewform?usp=dialog\" target=\"_blank\">Fill weekly post-check form</a>\n\nIf you answer \"Yes\" you'll be asked for:\n• topic heading\n• whether you want headings for the generated content\n• whether you need emojis\n• any description you already have (paste it in)\n\nIf you answer \"No\" we'll skip this week and try again next Sunday.\n\nThanks — automated reminder from your n8n assistant.\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        64,
+        0
+      ],
+      "id": "04b145db-f4f8-4df2-9968-1f22c5547d86",
+      "name": "Send email",
+      "webhookId": "322a5288-fdfb-4da6-9fcc-b300651ee51b",
+      "credentials": {
+        "smtp": {
+          "id": "TaDvLyXDCaZw3Wki",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?resourcekey=&gid=1371176848#gid=1371176848",
+          "mode": "url"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        288,
+        0
+      ],
+      "id": "7907ed5c-8303-40b0-a57c-15f09a2e79a7",
+      "name": "Google Sheets Trigger",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "8xNIdWAZI11qoRJN",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0d7d2d15-3c18-45f2-98c2-27961152e00a",
+              "leftValue": "={{ $json.lastRow.posted_on_monday }}",
+              "rightValue": "=Yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        0
+      ],
+      "id": "2ecee262-2022-4bb8-bd07-6975dff81c35",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Diagnostic: return the last row and a cleaned list of its keys so we can see exact header names\nif (!items || items.length === 0) return [];\n\nconst last = items[items.length - 1].json;\nconst keys = Object.keys(last);\n\n// build diagnostics: original key, cleaned key, value\nconst keyInfo = keys.map(k => ({\n  original: k,\n  cleanedForMatch: k.replace(/\\u00A0/g,' ').replace(/\\s+/g,' ').trim().toLowerCase(),\n  value: last[k]\n}));\n\nreturn [{ json: { lastRow: last, keys: keyInfo } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ],
+      "id": "498e5f89-9e9c-4129-aae7-c160aab3119b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert X (formerly Twitter) copywriter. Return ONLY one valid JSON object with keys: \\\"heading\\\" and \\\"post\\\".\\n- If requireHeading is true (or missing), produce a 4–8 word hook-style heading in \\\"heading\\\". Else set heading to \\\"\\\".\\n- \\\"post\\\" should be the final X post text (concise, impactful, suitable for X, within ~280 characters unless the content clearly benefits from a short thread).\\n- Use emojis by default unless noEmojis is true.\\n- Do NOT add meta text, suggestions, checklists, hashtags blocks, or offers.\\n- If userDraft is provided, improve it to match the requested tone and requirements; otherwise draft from topic+description.\\n- Output must be valid JSON only (single JSON object). No extra text.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Topic: {{$json.lastRow.topic_heading}}\\nDescription: {{$json.lastRow.user_description}}\\nRequireHeading: {{($json.lastRow.need_headings || '').toLowerCase() === 'yes'}}\\nNoEmojis: {{($json.lastRow.need_emojis || '').toLowerCase() === 'no'}}\\nUserDraft: {{$json.lastRow.user_draft || ''}}\\nTone: professional\\nConstraints: Output JSON only with keys \\\"heading\\\" and \\\"post\\\".\"\n    }\n  ],\n  \"temperature\": 0.6,\n  \"max_tokens\": 800\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        912,
+        0
+      ],
+      "id": "645e80a1-f40b-486b-9c53-588feddab67c",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Robust JSON extractor for AI responses (handles ```json fenced blocks)\nconst raw = $json?.choices?.[0]?.message?.content ?? $json?.message?.content ?? \"\";\n\nif(!raw || raw.trim().length === 0) {\n  throw new Error(\"No AI output found in the response.\");\n}\n\nlet text = String(raw).trim();\n\n// remove common fences like ```json or ``` ... ```\ntext = text.replace(/^\\s*```(?:json)?\\s*/i, \"\");\ntext = text.replace(/\\s*```\\s*$/i, \"\");\n\n// sometimes models prepend text; find the first { and the last }\nconst firstBrace = text.indexOf(\"{\");\nconst lastBrace = text.lastIndexOf(\"}\");\n\nif(firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {\n  throw new Error(\"Could not find a JSON object inside AI output. Raw output:\\n\" + raw);\n}\n\nconst candidate = text.slice(firstBrace, lastBrace + 1);\n\n// try parse\nlet parsed;\ntry {\n  parsed = JSON.parse(candidate);\n} catch (err) {\n  // include short raw snippet for debugging\n  throw new Error(\"Failed to parse JSON from AI output. Extracted text:\\n\" + candidate + \"\\n\\nParse error: \" + err.message);\n}\n\n// Return parsed JSON (so next nodes receive heading/post keys)\nreturn [{ json: parsed }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "01d80e78-9da4-41f2-b473-ac6e94e4b404",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bfcbc6c1-153a-44bb-bec5-8b6b63ebe9a6",
+              "name": "post_id",
+              "value": "={{$now}}",
+              "type": "string"
+            },
+            {
+              "id": "fc36d102-b609-496f-ba1f-eceec52506c7",
+              "name": "ai_heading",
+              "value": "={{$node[\"Code in JavaScript1\"].json[\"heading\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "9a368fb4-b24c-415c-9ecb-62ec6af6f4b1",
+              "name": "ai_post",
+              "value": "={{$node[\"Code in JavaScript1\"].json[\"post\"]}}",
+              "type": "string"
+            },
+            {
+              "id": "a9123167-b5bc-4933-b702-231b03f44a1e",
+              "name": "approval_status",
+              "value": "pending",
+              "type": "string"
+            },
+            {
+              "id": "2a03a501-456e-4b17-a6f7-45c045c2f381",
+              "name": "approved_at",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "41a01572-b0d6-453a-8a57-2aae1c1722a8",
+              "name": "posted",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1264,
+        0
+      ],
+      "id": "9601b0a5-0c86-43f3-962a-fdc3b3a01d22",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?resourcekey=&gid=1371176848#gid=1371176848",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        560,
+        208
+      ],
+      "id": "e0d70d61-7928-435b-b479-306ed8e24e37",
+      "name": "Get row(s) in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function getVal(obj, keys) {\n  for (const k of keys) {\n    if (obj && obj[k] !== undefined && obj[k] !== null) {\n      return String(obj[k]);\n    }\n  }\n  return \"\";\n}\n\n// 🔥 SAFE trigger read\nconst trg = $input.first()?.json || {};\n\nconst topic = getVal(trg, [\"topic_heading\",\"  topic_heading  \"]).trim().toLowerCase();\nconst desc = getVal(trg, [\"user_description\",\"  user_description  \"]).trim().toLowerCase();\nconst postedOnMon = getVal(trg, [\"posted_on_monday\",\"  posted_on_monday  \"]).trim().toLowerCase();\n\nif (!topic && !desc && !postedOnMon) {\n  throw new Error(\"Trigger item is empty. Run workflow from trigger, not this node.\");\n}\n\nfor (let i = 0; i < items.length; i++) {\n  const row = items[i].json;\n\n  const rTopic = getVal(row, [\"topic_heading\",\"  topic_heading  \"]).trim().toLowerCase();\n  const rDesc = getVal(row, [\"user_description\",\"  user_description  \"]).trim().toLowerCase();\n  const rPosted = getVal(row, [\"posted_on_monday\",\"  posted_on_monday  \"]).trim().toLowerCase();\n\n  if (\n    topic === rTopic &&\n    postedOnMon === rPosted &&\n    (desc === \"\" || desc === rDesc)\n  ) {\n    return [{ json: { rowIndex: i + 1, rowData: row } }];\n  }\n}\n\nthrow new Error(\n  \"No row match. Trigger values: \" +\n  JSON.stringify({ topic, desc, postedOnMon })\n);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        208
+      ],
+      "id": "5202a774-54fc-478c-8fe7-949650869d23",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1744,
+        16
+      ],
+      "id": "43b32b8d-49b9-4f45-a807-fd2baed1a60c",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?resourcekey=&gid=1371176848#gid=1371176848",
+          "mode": "url"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "posted": "false",
+            "approval_status": "=pending",
+            "ai_post": "={{ $json.ai_post }}",
+            "ai_heading": "={{ $json.ai_heading }}",
+            "post_id": "={{ $json.post_id }}",
+            "  posted_on_monday  ": "={{ $json[\"  posted_on_monday  \"] }}",
+            "  topic_heading  ": "={{ $json[\"  topic_heading  \"] }}",
+            "  need_headings  ": "={{ $json[\"  need_headings  \"] }}",
+            "  need_emojis  ": "={{ $json[\"  need_emojis  \"] }}",
+            "  user_description  ": "={{ $json[\"  user_description  \"] }}",
+            "row_number": "={{ $json.row_number }}\n"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "  posted_on_monday  ",
+              "displayName": "  posted_on_monday  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  topic_heading  ",
+              "displayName": "  topic_heading  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  need_headings  ",
+              "displayName": "  need_headings  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  need_emojis  ",
+              "displayName": "  need_emojis  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  user_description  ",
+              "displayName": "  user_description  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "post_id",
+              "displayName": "post_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ai_heading",
+              "displayName": "ai_heading",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_post",
+              "displayName": "ai_post",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "posted",
+              "displayName": "posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2096,
+        16
+      ],
+      "id": "c175fb3f-ef9b-450c-8b25-5cfd5e1349b2",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// merged item comes as items[0]\nconst item = items[0].json;\n\n// rowData contains form data\nconst row = item.rowData;\n\n// return final clean structure\nreturn [\n  {\n    json: {\n      posted: false,\n      approval_status: \"pending\",\n\n      ai_post: item.ai_post,\n      ai_heading: item.ai_heading,\n      post_id: item.post_id,\n\n      // form fields\n      \"  posted_on_monday  \": row[\"  posted_on_monday  \"],\n      \"  topic_heading  \": row[\"  topic_heading  \"],\n      \"  need_headings  \": row[\"  need_headings  \"],\n      \"  need_emojis  \": row[\"  need_emojis  \"],\n      \"  user_description  \": row[\"  user_description  \"],\n\n      row_number: row.row_number\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        16
+      ],
+      "id": "5fab0a83-3b49-4449-9146-bc980c25c8c6",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "fromEmail": "cpkrishsath21@gmail.com",
+        "toEmail": "cpkrishsath2005@gmail.com",
+        "subject": "Draft for Monday — please Approve or Improve",
+        "html": "=<p>Hi,</p>\n\n<p>Your LinkedIn draft is ready for review.</p>\n\n<p><strong>Heading:</strong><br/>\n{{$json.ai_heading}}</p>\n\n<p><strong>Post:</strong><br/>\n{{$json.ai_post}}</p>\n\n<p>\n👉 Please review and respond using this form:<br/>\n<a href=\"https://docs.google.com/forms/d/e/1FAIpQLSflbih_bumI-nhOXxqKwqs-H5neBe1pH0sucESX15mYTEoHtQ/viewform\n?usp=pp_url\n&entry.636550226={{$json.post_id}}\">\n👉 Open LinkedIn Post Approval Form\n</a>\n</p>\n\n<p>\n<em>⏰ Please approve before <strong>Monday 11:00 AM</strong>.</em>\n</p>\n\n<p>\nIf you select <strong>No</strong>, please mention improvements in the form.<br/>\nWe will revise and send it again.\n</p>\n\n<p>\nThanks,<br/>\nAutomation\n</p>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2240,
+        16
+      ],
+      "id": "8fb1ae8c-653f-4a6f-9488-188b4230e479",
+      "name": "Send email1",
+      "webhookId": "419737dc-ed08-47cb-9b09-bf28f0ec75e7",
+      "credentials": {
+        "smtp": {
+          "id": "TaDvLyXDCaZw3Wki",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 434847921,
+          "mode": "list",
+          "cachedResultName": "Form Responses 2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit#gid=434847921"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        2688,
+        16
+      ],
+      "id": "a0a45546-32de-4752-866b-4c306782a05d",
+      "name": "Google Sheets Trigger1",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "8xNIdWAZI11qoRJN",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      approval: String($input.first().json[\"Do you approve this X post?\"])\n        .trim()\n        .toLowerCase(),\n      improvement:\n        $json[\"Please mention what needs to be improved.\"] || \"\",\n      post_id: $json[\"post_id\"] || \"\"\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2864,
+        16
+      ],
+      "id": "1a728fef-d7dd-4052-b2cb-763dc6354adf",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "02af70bc-fa0c-4d6c-9355-37a8cb64721a",
+              "leftValue": "={{ $json.approval }}",
+              "rightValue": "yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3056,
+        16
+      ],
+      "id": "beb78401-a7b1-42b9-b831-9ebacbd30192",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1371176848,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit#gid=1371176848"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3936,
+        0
+      ],
+      "id": "965dd425-c2d0-4b19-bf36-cd77dd3b9b7d",
+      "name": "Get row(s) in sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const pid = $json.post_id;\n\nfor (const item of items) {\n  if (item.json.post_id === pid) {\n    return [{\n      json: {\n        post_id: pid,\n        previous_heading: item.json.ai_heading,\n        previous_post: item.json.ai_post,\n        improvement: $node[\"Code in JavaScript4\"].json.improvement\n      }\n    }];\n  }\n}\n\nthrow new Error(\"Post ID not found: \" + pid);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4208,
+        0
+      ],
+      "id": "c61f1f70-b66a-42ad-8223-63ea9de2c5cb",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_GROQ_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an expert X (formerly Twitter) copywriter. Return ONLY valid JSON with keys: heading and post.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Previous heading: {{$json.previous_heading}}\\n\\nPrevious post: {{$json.previous_post}}\\n\\nUser improvement request: {{$json.improvement}}\\n\\nImprove the post accordingly for X. Keep it concise, impactful, and suitable for X’s style. Return JSON only.\"\n    }\n  ],\n  \"temperature\": 0.6,\n  \"max_tokens\": 700\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4416,
+        0
+      ],
+      "id": "7ef4aae5-9048-476c-a9a7-acc81118488b",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Robust JSON extractor for AI responses (handles ```json fenced blocks)\nconst raw = $json?.choices?.[0]?.message?.content ?? $json?.message?.content ?? \"\";\n\nif(!raw || raw.trim().length === 0) {\n  throw new Error(\"No AI output found in the response.\");\n}\n\nlet text = String(raw).trim();\n\n// remove common fences like ```json or ``` ... ```\ntext = text.replace(/^\\s*```(?:json)?\\s*/i, \"\");\ntext = text.replace(/\\s*```\\s*$/i, \"\");\n\n// sometimes models prepend text; find the first { and the last }\nconst firstBrace = text.indexOf(\"{\");\nconst lastBrace = text.lastIndexOf(\"}\");\n\nif(firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {\n  throw new Error(\"Could not find a JSON object inside AI output. Raw output:\\n\" + raw);\n}\n\nconst candidate = text.slice(firstBrace, lastBrace + 1);\n\n// try parse\nlet parsed;\ntry {\n  parsed = JSON.parse(candidate);\n} catch (err) {\n  // include short raw snippet for debugging\n  throw new Error(\"Failed to parse JSON from AI output. Extracted text:\\n\" + candidate + \"\\n\\nParse error: \" + err.message);\n}\n\n// Return parsed JSON (so next nodes receive heading/post keys)\nreturn [{ json: parsed }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4608,
+        0
+      ],
+      "id": "dfadffde-93a8-435e-a905-8c6c5e0ff9ab",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bfcbc6c1-153a-44bb-bec5-8b6b63ebe9a6",
+              "name": "post_id",
+              "value": "={{$now}}",
+              "type": "string"
+            },
+            {
+              "id": "fc36d102-b609-496f-ba1f-eceec52506c7",
+              "name": "ai_heading",
+              "value": "={{$json.heading}}",
+              "type": "string"
+            },
+            {
+              "id": "9a368fb4-b24c-415c-9ecb-62ec6af6f4b1",
+              "name": "ai_post",
+              "value": "={{$json.post}}",
+              "type": "string"
+            },
+            {
+              "id": "a9123167-b5bc-4933-b702-231b03f44a1e",
+              "name": "approval_status",
+              "value": "pending",
+              "type": "string"
+            },
+            {
+              "id": "41a01572-b0d6-453a-8a57-2aae1c1722a8",
+              "name": "posted",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4800,
+        0
+      ],
+      "id": "d0ae4748-ff2b-4fe6-98a9-bfa5b42e6104",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        5008,
+        16
+      ],
+      "id": "118b9cfa-cce8-4168-97d9-7aaa7eafcee1",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?resourcekey=&gid=1371176848#gid=1371176848",
+          "mode": "url"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "posted": "false",
+            "approval_status": "=pending",
+            "ai_post": "={{ $json.ai_post }}",
+            "ai_heading": "={{ $json.ai_heading }}",
+            "post_id": "={{ $json.post_id }}",
+            "  posted_on_monday  ": "={{ $json[\"  posted_on_monday  \"] }}",
+            "  topic_heading  ": "={{ $json[\"  topic_heading  \"] }}",
+            "  need_headings  ": "={{ $json[\"  need_headings  \"] }}",
+            "  need_emojis  ": "={{ $json[\"  need_emojis  \"] }}",
+            "  user_description  ": "={{ $json[\"  user_description  \"] }}",
+            "row_number": "={{ $json.row_number }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "  posted_on_monday  ",
+              "displayName": "  posted_on_monday  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  topic_heading  ",
+              "displayName": "  topic_heading  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  need_headings  ",
+              "displayName": "  need_headings  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  need_emojis  ",
+              "displayName": "  need_emojis  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "  user_description  ",
+              "displayName": "  user_description  ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "post_id",
+              "displayName": "post_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ai_heading",
+              "displayName": "ai_heading",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_post",
+              "displayName": "ai_post",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "posted",
+              "displayName": "posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        5376,
+        16
+      ],
+      "id": "1edf2fff-2035-4141-b68f-c1679d871f46",
+      "name": "Update row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// merged item comes as items[0]\nconst item = items[0].json;\n\n// rowData contains form data\nconst row = item.rowData;\n\n// return final clean structure\nreturn [\n  {\n    json: {\n      posted: false,\n      approval_status: \"pending\",\n\n      ai_post: item.ai_post,\n      ai_heading: item.ai_heading,\n      post_id: item.post_id,\n\n      // form fields\n      \"  posted_on_monday  \": row[\"  posted_on_monday  \"],\n      \"  topic_heading  \": row[\"  topic_heading  \"],\n      \"  need_headings  \": row[\"  need_headings  \"],\n      \"  need_emojis  \": row[\"  need_emojis  \"],\n      \"  user_description  \": row[\"  user_description  \"],\n\n      row_number: row.row_number\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5184,
+        16
+      ],
+      "id": "071493b9-5108-4605-8eea-4158fefa101c",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "fromEmail": "cpkrishsath21@gmail.com",
+        "toEmail": "cpkrishsath2005@gmail.com",
+        "subject": "Draft for Monday — please Approve or Improve",
+        "html": "=<p>Hi,</p>\n\n<p>Your LinkedIn draft is ready for review.</p>\n\n<p><strong>Heading:</strong><br/>\n{{$json.ai_heading}}</p>\n\n<p><strong>Post:</strong><br/>\n{{$json.ai_post}}</p>\n\n<p>\n👉 Please review and respond using this form:<br/>\n<a href=\"https://docs.google.com/forms/d/e/1FAIpQLSflbih_bumI-nhOXxqKwqs-H5neBe1pH0sucESX15mYTEoHtQ/viewform\n?usp=pp_url\n&entry.636550226={{$json.post_id}}\">\n👉 Open LinkedIn Post Approval Form\n</a>\n</p>\n\n<p>\n<em>⏰ Please approve before <strong>Monday 11:00 AM</strong>.</em>\n</p>\n\n<p>\nIf you select <strong>No</strong>, please mention improvements in the form.<br/>\nWe will revise and send it again.\n</p>\n\n<p>\nThanks,<br/>\nAutomation\n</p>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        5520,
+        16
+      ],
+      "id": "8ae7afbc-06cf-42f2-86db-437b8bc5a6c7",
+      "name": "Send email2",
+      "webhookId": "419737dc-ed08-47cb-9b09-bf28f0ec75e7",
+      "credentials": {
+        "smtp": {
+          "id": "TaDvLyXDCaZw3Wki",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function getVal(obj, keys) {\n  for (const k of keys) {\n    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== \"\") {\n      return String(obj[k]).trim();\n    }\n  }\n  return \"\";\n}\n\n// Trigger row (from previous node)\nconst trg = items[0].json;\nconst trgPostId = getVal(trg, [\"post_id\"]);\n\nif (!trgPostId) {\n  throw new Error(\"Trigger row has no post_id\");\n}\n\n// All sheet rows come as input items AFTER read node\nfor (let i = 0; i < items.length; i++) {\n  const row = items[i].json;\n  const rowPostId = getVal(row, [\"post_id\"]);\n\n  if (rowPostId === trgPostId) {\n    return [{\n      json: {\n        rowIndex: i + 1,   // Google Sheets is 1-based\n        rowData: row\n      }\n    }];\n  }\n}\n\nthrow new Error(\"No row match for post_id: \" + trgPostId);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4208,
+        192
+      ],
+      "id": "87232722-5d18-4e7e-a566-5c9258d849e7",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1371176848,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit#gid=1371176848"
+        },
+        "clear": "specificRange",
+        "range": "A2:Z1000"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -80,
+        0
+      ],
+      "id": "7d0b6747-fa18-4cf0-bc87-66d0d6070b52",
+      "name": "Clear sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 434847921,
+          "mode": "list",
+          "cachedResultName": "Form Responses 2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit#gid=434847921"
+        },
+        "clear": "specificRange",
+        "range": "A2:Z1000"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3744,
+        0
+      ],
+      "id": "c4d135b1-92fb-4d21-98ce-ea1d21f4cda8",
+      "name": "Clear sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\n\n// clone date\nconst d = new Date(now);\nconst day = d.getDay(); // 0=Sun, 1=Mon\n\n// find Sunday of this week\nconst diffToSunday = -day;\nconst sunday = new Date(d);\nsunday.setDate(d.getDate() + diffToSunday);\nsunday.setHours(11, 0, 0, 0); // Sunday 11:00 AM\n\n// find Monday of this week\nconst monday = new Date(sunday);\nmonday.setDate(sunday.getDate() + 1);\nmonday.setHours(11, 0, 0, 0); // Monday 11:00 AM\n\nconst in_window = now >= sunday && now < monday;\n\nreturn [{\n  json: {\n    in_window,\n    now: now.toISOString(),\n    window_start: sunday.toISOString(),\n    window_end: monday.toISOString()\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3328,
+        -240
+      ],
+      "id": "0b8bf597-4082-414e-855c-c47cf70c4581",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d51046bc-0580-4f2d-b8a6-71ac54d87471",
+              "leftValue": "={{ $json.in_window }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "30658b4e-c237-488c-9361-6324a79a5bc9",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3488,
+        -240
+      ],
+      "id": "f235c809-e5f0-4f60-b421-b931621f26e1",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "fromEmail": "cpkrishsath21@gmail.com",
+        "toEmail": "cpkrishsath2005@gmail.com",
+        "subject": "⏰ LinkedIn Post Approval Window Closed – See You Next Sunday",
+        "html": "=<p>Hi,</p>\n\n<p>\nThe approval window for this week’s LinkedIn post has <strong>closed</strong>.\n</p>\n\n<p>\n⏱ <strong>Deadline:</strong> Monday 11:00 AM<br/>\n🕒 <strong>Current time:</strong> {{ $json.now }}\n</p>\n\n<p>\nSince approval was not received before the deadline, the post has <strong>not been published</strong>.\n</p>\n\n<p>\n🔁 A fresh post will be generated and sent for review on <strong>next Sunday at 11:00 AM</strong>.\n</p>\n\n<hr/>\n\n<p>\n<strong>Post ID:</strong><br/>\n<code>{{ $json.post_id || 'N/A' }}</code>\n</p>\n\n<p style=\"color:#666;font-size:12px;\">\nThis is an automated message. No action is required.\n</p>\n\n<p>\nThanks,<br/>\n<b>Automation</b>\n</p>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3744,
+        -224
+      ],
+      "id": "4137448f-6903-448c-88f2-7a21d910ccc1",
+      "name": "Send email3",
+      "webhookId": "889f7462-4ba0-4c40-b1a6-dfe116e4b32f",
+      "credentials": {
+        "smtp": {
+          "id": "TaDvLyXDCaZw3Wki",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d51046bc-0580-4f2d-b8a6-71ac54d87471",
+              "leftValue": "={{ $json.in_window }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3440,
+        16
+      ],
+      "id": "81266a26-75db-47b2-9616-a8a826418435",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "fromEmail": "cpkrishsath21@gmail.com",
+        "toEmail": "cpkrishsath2005@gmail.com",
+        "subject": "⏰ LinkedIn Post Approval Time Over",
+        "html": "=<p>Hi,</p>\n\n<p>The approval window for this week’s LinkedIn post has closed.</p>\n\n<p><strong>Deadline:</strong> Monday 11:00 AM</p>\n\n<p>Your post was <strong>not published</strong>.</p>\n\n<p>No worries — we’ll start a <strong>fresh cycle next Sunday at 11:00 AM</strong> with a new post.</p>\n\n<p>Thanks,<br/>\nAutomation</p>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3744,
+        192
+      ],
+      "id": "399ebeab-0e8d-4f9e-9db1-4b9091692793",
+      "name": "Send email4",
+      "webhookId": "889f7462-4ba0-4c40-b1a6-dfe116e4b32f",
+      "credentials": {
+        "smtp": {
+          "id": "TaDvLyXDCaZw3Wki",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\n\n// clone date\nconst d = new Date(now);\nconst day = d.getDay(); // 0=Sun, 1=Mon\n\n// find Sunday of this week\nconst diffToSunday = -day;\nconst sunday = new Date(d);\nsunday.setDate(d.getDate() + diffToSunday);\nsunday.setHours(11, 0, 0, 0); // Sunday 11:00 AM\n\n// find Monday of this week\nconst monday = new Date(sunday);\nmonday.setDate(sunday.getDate() + 1);\nmonday.setHours(11, 0, 0, 0); // Monday 11:00 AM\n\nconst in_window = now >= sunday && now < monday;\n\nreturn [{\n  json: {\n    in_window,\n    now: now.toISOString(),\n    window_start: sunday.toISOString(),\n    window_end: monday.toISOString()\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        16
+      ],
+      "id": "a8aa460a-f1fd-486c-8145-e724415908f2",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1371176848,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit#gid=1371176848"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "approval_status": "approved",
+            "row_number": 2
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "posted_on_monday",
+              "displayName": "posted_on_monday",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "topic_heading",
+              "displayName": "topic_heading",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "need_headings",
+              "displayName": "need_headings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "need_emojis",
+              "displayName": "need_emojis",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_description",
+              "displayName": "user_description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "post_id",
+              "displayName": "post_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_heading",
+              "displayName": "ai_heading",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ai_post",
+              "displayName": "ai_post",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "approval_status",
+              "displayName": "approval_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "approved_at",
+              "displayName": "approved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posted",
+              "displayName": "posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3168,
+        -240
+      ],
+      "id": "3011b4c3-acdb-4f38-b859-226c28d35486",
+      "name": "Update row in sheet3",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth1Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.final_post }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4144,
+        -416
+      ],
+      "id": "a6ddab1f-90ff-4412-9183-37120ee42757",
+      "name": "HTTP Request2",
+      "credentials": {
+        "oAuth1Api": {
+          "id": "Co50sgvErUIUceYT",
+          "name": "Unnamed credential"
+        },
+        "oAuth2Api": {
+          "id": "dQXHUOPabR9h6GuU",
+          "name": "Unnamed credential 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1371176848,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit#gid=1371176848"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3760,
+        -416
+      ],
+      "id": "3a8dcbc4-5883-4a69-9d21-2a359eb477e9",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let heading = $json.ai_heading || '';\nlet body = $json.ai_post || '';\nlet post = '';\n\n// Add heading if enabled\nif ($json.need_headings === 'Yes' && heading) {\n  post += heading.trim() + '\\n\\n';\n}\n\n// Add body\npost += body.trim();\n\n// Add emojis if enabled\nif ($json.need_emojis === 'Yes') {\n  post += ' 🚀';\n}\n\n// X character limit\npost = post.slice(0, 280);\n\nreturn [{\n  json: {\n    final_post: post\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3952,
+        -416
+      ],
+      "id": "8fb33777-e9f5-4d41-ba56-5020c1caf100",
+      "name": "Code in JavaScript11"
+    },
+    {
+      "parameters": {
+        "fromEmail": "cpkrishsath21@gmail.com",
+        "toEmail": "cpkrishsath2005@gmail.com",
+        "subject": "Your post is live on X 🚀",
+        "html": "=<div style=\"font-family: Arial, Helvetica, sans-serif; background:#f5f7fa; padding:20px;\">\n  <div style=\"max-width:600px; margin:auto; background:#ffffff; border-radius:8px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,0.08);\">\n\n    <h2 style=\"color:#111827; margin-top:0;\">\n      🚀 Your post is live on X\n    </h2>\n\n    <p style=\"color:#374151; font-size:14px;\">\n      Hi,<br><br>\n      Your content has been <strong>successfully posted</strong> on X. Here are the details:\n    </p>\n\n    <div style=\"background:#f9fafb; border-left:4px solid #22c55e; padding:16px; margin:20px 0;\">\n      <p style=\"margin:0; white-space:pre-line; color:#111827; font-size:14px;\">\n        {{ $json.data.text }}\n      </p>\n    </div>\n\n    <p style=\"color:#6b7280; font-size:13px;\">\n      <strong>Posted at:</strong> {{new Date().toLocaleString()}}\n    </p>\n\n    <p style=\"margin-top:24px; color:#374151; font-size:14px;\">\n      All good 👍\n    </p>\n\n    <hr style=\"border:none; border-top:1px solid #e5e7eb; margin:24px 0;\">\n\n    <p style=\"font-size:12px; color:#9ca3af;\">\n      This email was sent automatically using <strong>n8n</strong>.\n    </p>\n\n  </div>\n</div>\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4304,
+        -416
+      ],
+      "id": "1566e9e6-8d7c-4ad7-91a8-2d75a7370093",
+      "name": "Send email5",
+      "webhookId": "b9617008-bc99-4272-98db-9a4eb6123d4c",
+      "credentials": {
+        "smtp": {
+          "id": "TaDvLyXDCaZw3Wki",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g",
+          "mode": "list",
+          "cachedResultName": "Weekly Post Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 434847921,
+          "mode": "list",
+          "cachedResultName": "Form Responses 2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j7By2b_8csvXPr4W0NxP-wjjDoxMIOBps2--99_2x5g/edit#gid=434847921"
+        },
+        "clear": "specificRange",
+        "range": "A2:Z1000"
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2448,
+        16
+      ],
+      "id": "a6b08ba4-41fa-4327-bd29-168717d6c364",
+      "name": "Clear sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RdW6EggigTXU1VuU",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Clear sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get row(s) in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Send email2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Clear sheet1": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send email3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Clear sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send email4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript11": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Send email5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send email1": {
+      "main": [
+        [
+          {
+            "node": "Clear sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c3189d73-36ae-448e-9bb0-5e4aa75e633b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3be7304e5bb9735fa3d6adc1c9f550793cb70350cd27d619afa8e71b73782d4d"
+  },
+  "id": "096Ja6D77YXJzFeJ",
+  "tags": []
+}
